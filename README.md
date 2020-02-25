@@ -6,3 +6,5 @@
 ## Image Preprocessing
 
 - The type of the medical image is DICOM, but we can't see details of the images and use them for operations. So we need to transform them. The folder "Image Transformation" is used to transform the type and make the images visible. These codes are copied from the Internet.
+  - The "imgtrans.py" is used to transform the DICOM file to mhd and raw files.
+  - The "readimg.py" is used to make the mhd file visible.
