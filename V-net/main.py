@@ -12,10 +12,6 @@ import dtset_modify as dset
 import Vnet
 import os
 
-torch.cuda.empty_cache()
-
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
-
 # the root directory of all data
 root = '/home/workspace/data/Vnet_liver/'
 # the specific directory of the training data
@@ -39,41 +35,30 @@ def weights_init(m):
 
 def main():
     print("build vnet")
-    model = Vnet.VNet(elu=False)
+    model = Vnet.VNet()
     model.apply(weights_init)
     if torch.cuda.is_available():
         model = model.cuda()
 
-    # # LUNA16 dataset isotropically scaled to 2.5mm^3
-    # # and then truncated or zero-padded to 160x128x160
-    # normMu = [-642.794]
-    # normSigma = [459.512]
-    # normTransform = transforms.Normalize(normMu, normSigma)
-    # trainTransform=transforms.Compose([transforms.ToTensor(), normTransform])
-    # testTransform=transforms.Compose([transforms.ToTensor(), normTransform])
-
     print("loading training set")
-    trainSet = dset.Liver_CT(root=root, images=images, targets=label, transform=None, split=target_split)
+    trainSet = dset.Liver_CT(root=root, images=images, targets=label, split=target_split)
     trainLoader = DataLoader(trainSet, batch_size=batch_size, shuffle=True)
     print("loading test set")
-    testSet = dset.Liver_CT(root=root, images=ct_images, targets=ct_targets, transform=None, split=target_split)
+    testSet = dset.Liver_CT(root=root, images=ct_images, targets=ct_targets, split=target_split)
     testLoader = DataLoader(testSet, batch_size=batch_size, shuffle=False)
 
     target_mean = trainSet.target_mean()
     bg_weight = target_mean / (1. + target_mean)
     fg_weight = 1. - bg_weight
-    print(bg_weight)
     class_weight = torch.FloatTensor([bg_weight, fg_weight])
+    print(bg_weight, class_weight)
 
-    # optimizer = optim.SGD(model.parameters(), lr=1e-2, momentum=0.99)
     optimizer = optim.Adam(model.parameters(), lr=1e-4)
-
     for epoch in range(epochs):
         print(epoch, ":loading")
         train(model, trainLoader, optimizer)
-
     torch.save(model.state_dict(), 'weights.pth')
-    test(model, testLoader)
+    test(testLoader)
 
 
 def train(model, trainLoader, optimizer):
@@ -97,8 +82,8 @@ def train(model, trainLoader, optimizer):
         print(batch_idx, loss, err)
 
 
-def test(model, testLoader):
-    model = Vnet.VNet(elu=False)
+def test(testLoader):
+    model = Vnet.VNet()
     model.load_state_dict(torch.load('weights.pth'))
     if torch.cuda.is_available():
         model = model.cuda()
