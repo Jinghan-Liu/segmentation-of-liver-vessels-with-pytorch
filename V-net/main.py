@@ -51,17 +51,16 @@ def main():
     bg_weight = target_mean / (1. + target_mean)
     fg_weight = 1. - bg_weight
     class_weight = torch.FloatTensor([bg_weight, fg_weight])
-    print(bg_weight, class_weight)
 
     optimizer = optim.Adam(model.parameters(), lr=1e-4)
     for epoch in range(epochs):
         print(epoch, ":loading")
-        train(model, trainLoader, optimizer)
+        train(model, trainLoader, optimizer, class_weight)
     torch.save(model.state_dict(), 'weights.pth')
-    test(testLoader)
+    test(testLoader,class_weight)
 
 
-def train(model, trainLoader, optimizer):
+def train(model, trainLoader, optimizer, weights):
     model = model.cuda()
     model.train()
     for batch_idx, (data, target) in enumerate(trainLoader):
@@ -72,7 +71,7 @@ def train(model, trainLoader, optimizer):
         output = model(data)
         target = target.view(target.numel())
         # loss1 = bioloss.dice_loss(output, target)
-        loss = F.nll_loss(output, target)
+        loss = F.nll_loss(output, target, weight=weights)
         loss.backward()
         optimizer.step()
         pred = output.data.max(1)[1]
@@ -82,7 +81,7 @@ def train(model, trainLoader, optimizer):
         print(batch_idx, loss, err)
 
 
-def test(testLoader):
+def test(testLoader, weights):
     model = Vnet.VNet()
     model.load_state_dict(torch.load('weights.pth'))
     if torch.cuda.is_available():
@@ -93,9 +92,10 @@ def test(testLoader):
             if torch.cuda.is_available():
                 data, target = data.cuda(), target.cuda()
             data, target = Variable(data), Variable(target)
+            target = target.view(target.numel())
             output = model(data)
             # loss = bioloss.dice_loss(output, target).data[0]
-            loss = F.nll_loss(output, target)
+            loss = F.nll_loss(output, target, weight=weights).data[0]
             pred = output.data.max(1)[1]
             incorrect = pred.ne(target.data).cpu().sum()
             loss = 1 + loss.item()
